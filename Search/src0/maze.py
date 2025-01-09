@@ -1,11 +1,12 @@
 import sys
+from tabulate import tabulate
+from PIL import Image, ImageDraw
 
 class Node():
     def __init__(self, state, parent, action):
         self.state = state
         self.parent = parent
         self.action = action
-
 
 class StackFrontier():
     def __init__(self):
@@ -28,41 +29,20 @@ class StackFrontier():
             self.frontier = self.frontier[:-1]
             return node
 
-
-class QueueFrontier(StackFrontier):
-
-    def remove(self):
-        if self.empty():
-            raise Exception("empty frontier")
-        else:
-            node = self.frontier[0]
-            self.frontier = self.frontier[1:]
-            return node
-
 class Maze():
-
-    #TODO ----------------------------------------------------------------------------------------- #
-    #TODO ------------------------------ Build a maze from a file --------------------------------- #
-    #TODO ----------------------------------------------------------------------------------------- #
-
     def __init__(self, filename):
-
-        #! ---------------------- Read file and set height and width of maze ---------------------- #
         with open(filename) as f:
             contents = f.read()
-        
-        #! -------------------------------- Validate start and goal ------------------------------- #
+
         if contents.count("A") != 1:
             raise Exception("maze must have exactly one start point")
         if contents.count("B") != 1:
             raise Exception("maze must have exactly one goal")
 
-        #! --------------------------- Determine height and width of maze ------------------------- #
         contents = contents.splitlines()
         self.height = len(contents)
         self.width = max(len(line) for line in contents)
 
-        #! ---------------------------------- Keep track of walls --------------------------------- #
         self.walls = []
         for i in range(self.height):
             row = []
@@ -84,7 +64,6 @@ class Maze():
 
         self.solution = None
 
-
     def print(self):
         solution = self.solution[1] if self.solution is not None else None
         print()
@@ -103,7 +82,6 @@ class Maze():
             print()
         print()
 
-
     def neighbors(self, state):
         row, col = state
         candidates = [
@@ -119,34 +97,43 @@ class Maze():
                 result.append((action, (r, c)))
         return result
 
-
     def solve(self):
         """Finds a solution to maze, if one exists."""
-
-        # Keep track of number of states explored
         self.num_explored = 0
-
-        # Initialize frontier to just the starting position
         start = Node(state=self.start, parent=None, action=None)
-        #frontier = StackFrontier()
-        frontier = QueueFrontier()
+        frontier = StackFrontier()
         frontier.add(start)
-
-        # Initialize an empty explored set
         self.explored = set()
 
-        # Keep looping until solution found
-        while True:
+        # Preparar tabla de datos para exportar
+        table_data = []
+        headers = ["Interation", "Current Node(Y,X)", "Parent", "Action", "Frontier", "Explored"]
+        iteration = 0
 
-            # If nothing left in frontier, then no path
+        while True:
             if frontier.empty():
                 raise Exception("no solution")
 
-            # Choose a node from the frontier
             node = frontier.remove()
             self.num_explored += 1
+            iteration += 1
 
-            # If node is the goal, then we have a solution
+            # Registrar información de la iteración
+            current_state = node.state
+            parent_state = node.parent.state if node.parent else None
+            action = node.action
+            frontier_states = [n.state for n in frontier.frontier]
+            explored_states = list(self.explored)
+
+            table_data.append([
+                iteration,
+                current_state,
+                parent_state,
+                action,
+                frontier_states,
+                explored_states
+            ])
+
             if node.state == self.goal:
                 actions = []
                 cells = []
@@ -157,24 +144,23 @@ class Maze():
                 actions.reverse()
                 cells.reverse()
                 self.solution = (actions, cells)
+
+                # Exportar tabla a archivo
+                with open("tabla.txt", "w") as file:
+                    file.write(tabulate(table_data, headers=headers, tablefmt="grid"))
                 return
 
-            # Mark node as explored
             self.explored.add(node.state)
 
-            # Add neighbors to frontier
             for action, state in self.neighbors(node.state):
                 if not frontier.contains_state(state) and state not in self.explored:
                     child = Node(state=state, parent=node, action=action)
                     frontier.add(child)
 
-
     def output_image(self, filename, show_solution=True, show_explored=False):
-        from PIL import Image, ImageDraw
         cell_size = 50
         cell_border = 2
 
-        # Create a blank canvas
         img = Image.new(
             "RGBA",
             (self.width * cell_size, self.height * cell_size),
@@ -185,35 +171,22 @@ class Maze():
         solution = self.solution[1] if self.solution is not None else None
         for i, row in enumerate(self.walls):
             for j, col in enumerate(row):
-
-                # Walls
                 if col:
-                    fill = (40, 40, 40)     #Color: Dark Gray
-
-                # Start
+                    fill = (40, 40, 40)  # Dark Gray
                 elif (i, j) == self.start:
-                    fill = (255, 0, 0)      #Color: Red
-
-                # Goal
+                    fill = (255, 0, 0)  # Red
                 elif (i, j) == self.goal:
-                    fill = (0, 171, 28)     #Color: Green
-
-                # Solution
+                    fill = (0, 171, 28)  # Green
                 elif solution is not None and show_solution and (i, j) in solution:
-                    fill = (220, 235, 113)  #Color: Yellow
-
-                # Explored
+                    fill = (220, 235, 113)  # Yellow
                 elif solution is not None and show_explored and (i, j) in self.explored:
-                    fill = (212, 97, 85)    #Color: Red
-
-                # Empty cell
+                    fill = (212, 97, 85)  # Red
                 else:
-                    fill = (237, 240, 252)  #Color: White
+                    fill = (237, 240, 252)  # White
 
-                # Draw cell
                 draw.rectangle(
-                    ([(j * cell_size + cell_border, i * cell_size + cell_border),
-                      ((j + 1) * cell_size - cell_border, (i + 1) * cell_size - cell_border)]),
+                    [(j * cell_size + cell_border, i * cell_size + cell_border),
+                     ((j + 1) * cell_size - cell_border, (i + 1) * cell_size - cell_border)],
                     fill=fill
                 )
 
@@ -226,9 +199,12 @@ if len(sys.argv) != 2:
 m = Maze(sys.argv[1])
 print("Maze:")
 m.print()
+
 print("Solving...")
 m.solve()
+
 print("States Explored:", m.num_explored)
+
 print("Solution:")
 m.print()
 m.output_image("maze_ini.png", show_explored=False, show_solution=False)
