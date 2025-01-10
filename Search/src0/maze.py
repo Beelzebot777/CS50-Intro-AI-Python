@@ -29,6 +29,16 @@ class StackFrontier():
             self.frontier = self.frontier[:-1]
             return node
 
+class QueueFrontier(StackFrontier):
+
+    def remove(self):
+        if self.empty():
+            raise Exception("empty frontier")
+        else:
+            node = self.frontier[0]
+            self.frontier = self.frontier[1:]
+            return node
+
 class Maze():
     def __init__(self, filename):
         with open(filename) as f:
@@ -101,7 +111,8 @@ class Maze():
         """Finds a solution to maze, if one exists."""
         self.num_explored = 0
         start = Node(state=self.start, parent=None, action=None)
-        frontier = StackFrontier()
+        #frontier = StackFrontier()
+        frontier = QueueFrontier()
         frontier.add(start)
         self.explored = set()
 
@@ -160,17 +171,24 @@ class Maze():
     def output_image(self, filename, show_solution=True, show_explored=False):
         cell_size = 50
         cell_border = 2
+        label_size = 20
 
-        img = Image.new(
-            "RGBA",
-            (self.width * cell_size, self.height * cell_size),
-            "black"
-        )
+        img_width = self.width * cell_size + label_size
+        img_height = self.height * cell_size + label_size
+
+        img = Image.new("RGBA", (img_width, img_height), "black")
         draw = ImageDraw.Draw(img)
 
         solution = self.solution[1] if self.solution is not None else None
+        
+        # Draw grid with walls, start, goal, solution, and explored states
         for i, row in enumerate(self.walls):
             for j, col in enumerate(row):
+                x_start = j * cell_size + label_size
+                y_start = i * cell_size + label_size
+                x_end = x_start + cell_size - cell_border
+                y_end = y_start + cell_size - cell_border
+
                 if col:
                     fill = (40, 40, 40)  # Dark Gray
                 elif (i, j) == self.start:
@@ -184,14 +202,18 @@ class Maze():
                 else:
                     fill = (237, 240, 252)  # White
 
-                draw.rectangle(
-                    [(j * cell_size + cell_border, i * cell_size + cell_border),
-                     ((j + 1) * cell_size - cell_border, (i + 1) * cell_size - cell_border)],
-                    fill=fill
-                )
+                draw.rectangle([(x_start, y_start), (x_end, y_end)], fill=fill)
+
+        # Add labels for X and Y axes
+        for i in range(self.height):
+            y_label = i * cell_size + label_size + cell_size // 2
+            draw.text((5, y_label - 10), str(i), fill="white")
+
+        for j in range(self.width):
+            x_label = j * cell_size + label_size + cell_size // 2
+            draw.text((x_label - 10, 5), str(j), fill="white")
 
         img.save(filename)
-
 
 if len(sys.argv) != 2:
     sys.exit("Usage: python maze.py maze.txt")
