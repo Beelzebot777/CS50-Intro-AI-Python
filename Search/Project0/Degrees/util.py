@@ -7,7 +7,7 @@ class Node():
 
 class StackFrontier():
     def __init__(self):
-        self.frontier = []
+        self.frontier = []          #Aqui se guardan los nodos         
 
     def add(self, node):
         self.frontier.append(node)
